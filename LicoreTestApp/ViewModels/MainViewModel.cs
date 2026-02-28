@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Data;
+using Microsoft.Win32;
 using System.Windows.Input;
 using LicoreTestApp.Interop;
 using LicoreTestApp.Models;
@@ -105,6 +106,54 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set { if (_testToday == value) return; _testToday = value; OnPropertyChanged(); }
     }
 
+    private string _entitlementCode = "ENT-0001";
+
+    /// <summary>Entitlement / SKU code passed to lc_generate_request.</summary>
+    public string EntitlementCode
+    {
+        get => _entitlementCode;
+        set { if (_entitlementCode == value) return; _entitlementCode = value; OnPropertyChanged(); }
+    }
+
+    private string _customerName = string.Empty;
+
+    /// <summary>Customer display name passed to lc_generate_request.</summary>
+    public string CustomerName
+    {
+        get => _customerName;
+        set { if (_customerName == value) return; _customerName = value; OnPropertyChanged(); }
+    }
+
+    private string _taxId = string.Empty;
+
+    /// <summary>Customer tax/VAT identifier passed to lc_generate_request.</summary>
+    public string TaxId
+    {
+        get => _taxId;
+        set { if (_taxId == value) return; _taxId = value; OnPropertyChanged(); }
+    }
+
+    private string _email = string.Empty;
+
+    /// <summary>Customer e-mail address passed to lc_generate_request.</summary>
+    public string Email
+    {
+        get => _email;
+        set { if (_email == value) return; _email = value; OnPropertyChanged(); }
+    }
+
+    private string _generatedJson = string.Empty;
+
+    /// <summary>
+    /// The most recent JSON produced by <see cref="GenerateRequestCommand"/>.
+    /// Read-only from the UI; set internally after a successful lc_generate_request call.
+    /// </summary>
+    public string GeneratedJson
+    {
+        get => _generatedJson;
+        private set { if (_generatedJson == value) return; _generatedJson = value; OnPropertyChanged(); }
+    }
+
     private string _statusMessage = "Listo.";
 
     /// <summary>One-line status displayed in the window footer StatusBar.</summary>
@@ -129,6 +178,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Calls lc_reason_message(<see cref="SelectedReasonCode"/>) and logs the result.</summary>
     public ICommand ReasonMessageCommand { get; }
+
+    /// <summary>
+    /// Runs lc_generate_request with the H5 form fields and stores the resulting JSON.
+    /// </summary>
+    public ICommand GenerateRequestCommand { get; }
+
+    /// <summary>
+    /// Opens a SaveFileDialog and persists <see cref="GeneratedJson"/> via lc_write_request_file.
+    /// </summary>
+    public ICommand SaveRequestFileCommand { get; }
 
     /// <summary>
     /// Validates <see cref="ProductName"/>/<see cref="ProductVersion"/> via lc_validate_full.
@@ -157,8 +216,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ClearLogCommand       = new RelayCommand(_ => ClearLog());
         PingCommand           = new RelayCommand(_ => ExecutePing());
         ReasonMessageCommand  = new RelayCommand(_ => ExecuteReasonMessage());
-        ValidateFullCommand   = new RelayCommand(_ => ExecuteValidate(cached: false));
-        ValidateCachedCommand = new RelayCommand(_ => ExecuteValidate(cached: true));
+        GenerateRequestCommand = new RelayCommand(_ => ExecuteGenerateRequest());
+        SaveRequestFileCommand = new RelayCommand(_ => ExecuteSaveRequestFile());
+        ValidateFullCommand    = new RelayCommand(_ => ExecuteValidate(cached: false));
+        ValidateCachedCommand  = new RelayCommand(_ => ExecuteValidate(cached: true));
         _copyLogCmd           = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
 
         Results.CollectionChanged += OnResultsChanged;
@@ -253,6 +314,150 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Log(new TestResult
             {
                 FunctionName = "lc_reason_message",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ExecuteGenerateRequest()
+    {
+        if (string.IsNullOrWhiteSpace(ProductName)    ||
+            string.IsNullOrWhiteSpace(ProductVersion) ||
+            string.IsNullOrWhiteSpace(EntitlementCode)||
+            string.IsNullOrWhiteSpace(CustomerName))
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_generate_request",
+                ApiResult    = LicoreApi.LcResult.InvalidArgument,
+                Detail       = "ProductName, ProductVersion, EntitlementCode y CustomerName son obligatorios.",
+                Timestamp    = DateTime.Now,
+            });
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var (apiResult, reason, json) = LicoreApi.GenerateRequest(
+                ProductName, ProductVersion, EntitlementCode,
+                CustomerName, TaxId, Email);
+
+            if (apiResult == LicoreApi.LcResult.Ok && json is not null)
+            {
+                GeneratedJson = json;
+                string preview = json.Length > 120 ? json[..120] + "..." : json;
+                Log(new TestResult
+                {
+                    FunctionName = "lc_generate_request",
+                    ApiResult    = apiResult,
+                    ReasonCode   = reason,
+                    Detail       = preview,
+                    Timestamp    = DateTime.Now,
+                });
+            }
+            else
+            {
+                GeneratedJson = string.Empty;
+                string? msg = LicoreApi.GetReasonMessage((int)reason);
+                Log(new TestResult
+                {
+                    FunctionName  = "lc_generate_request",
+                    ApiResult     = apiResult,
+                    ReasonCode    = reason,
+                    ReasonMessage = msg,
+                    Timestamp     = DateTime.Now,
+                });
+            }
+        }
+        catch (SEHException ex)
+        {
+            GeneratedJson = string.Empty;
+            Log(new TestResult
+            {
+                FunctionName = "lc_generate_request",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            GeneratedJson = string.Empty;
+            Log(new TestResult
+            {
+                FunctionName = "lc_generate_request",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ExecuteSaveRequestFile()
+    {
+        if (string.IsNullOrEmpty(GeneratedJson))
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_write_request_file",
+                ApiResult    = LicoreApi.LcResult.InvalidArgument,
+                Detail       = "Sin .req generado. Ejecute primero 'Generar .req'.",
+                Timestamp    = DateTime.Now,
+            });
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Filter     = "Request file (*.req)|*.req",
+            DefaultExt = "req",
+            FileName   = $"{ProductName}_{ProductVersion}.req",
+        };
+
+        if (dlg.ShowDialog() != true) return;
+
+        string path = dlg.FileName;
+        IsBusy = true;
+        try
+        {
+            var (apiResult, reason) = LicoreApi.WriteRequestFile(path, GeneratedJson);
+            string? msg = LicoreApi.GetReasonMessage((int)reason);
+            Log(new TestResult
+            {
+                FunctionName  = "lc_write_request_file",
+                ApiResult     = apiResult,
+                ReasonCode    = reason,
+                ReasonMessage = msg,
+                Detail        = path,
+                Timestamp     = DateTime.Now,
+            });
+        }
+        catch (SEHException ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_write_request_file",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_write_request_file",
                 ApiResult    = LicoreApi.LcResult.InternalError,
                 Detail       = ex.Message,
                 Timestamp    = DateTime.Now,

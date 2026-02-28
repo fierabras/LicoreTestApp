@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LicoreTestApp.Interop;
 
@@ -175,6 +176,46 @@ public static class LicoreApi
     {
         int rc = lc_reason_message(reasonCode, out IntPtr ptr);
         return rc == (int)LcResult.Ok ? Marshal.PtrToStringAnsi(ptr) : null;
+    }
+
+    /// <summary>
+    /// Generates a license-request JSON using the two-step buffer pattern.
+    /// Step 1 calls with null/0 to obtain the required size; step 2 fills a caller-owned buffer.
+    /// Returns <c>(ApiResult, Reason, Json)</c>; <c>Json</c> is non-null only on <see cref="LcResult.Ok"/>.
+    /// The buffer is owned by the caller; licore.dll does not retain a reference.
+    /// </summary>
+    public static (LcResult ApiResult, LcReason Reason, string? Json) GenerateRequest(
+        string productName, string version, string entitlementCode,
+        string customerName, string taxId, string email)
+    {
+        // Step 1 — size query
+        lc_generate_request(productName, version, entitlementCode,
+            customerName, taxId, email,
+            null, 0, out int needed, out int reason1);
+
+        if (needed <= 0)
+            return (LcResult.InternalError, (LcReason)reason1, null);
+
+        // Step 2 — fill
+        byte[] buf = new byte[needed + 1];
+        int rc2 = lc_generate_request(productName, version, entitlementCode,
+            customerName, taxId, email,
+            buf, needed + 1, out int written, out int reason2);
+
+        if (rc2 == (int)LcResult.Ok)
+            return (LcResult.Ok, (LcReason)reason2, Encoding.UTF8.GetString(buf, 0, written));
+
+        return ((LcResult)rc2, (LcReason)reason2, null);
+    }
+
+    /// <summary>
+    /// Persists <paramref name="reqJson"/> to <paramref name="reqPath"/> via <c>lc_write_request_file</c>.
+    /// Returns <c>(ApiResult, Reason)</c>.
+    /// </summary>
+    public static (LcResult ApiResult, LcReason Reason) WriteRequestFile(string reqPath, string reqJson)
+    {
+        int rc = lc_write_request_file(reqPath, reqJson, out int reason);
+        return ((LcResult)rc, (LcReason)reason);
     }
 
     /// <summary>

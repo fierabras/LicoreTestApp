@@ -177,12 +177,69 @@
                             </GroupBox>
 
                             <!-- 4. Generate Request -->
-                            <GroupBox Header="Generate Request" Margin="0,0,0,6">
-                                <Button x:Name="BtnGenReq"
-                                        Content="Generar .req"
-                                        IsEnabled="{Binding IsNotBusy}"
-                                        HorizontalAlignment="Left"
-                                        Margin="4" Padding="8,3"/>
+                            <GroupBox Header="Generate Request (.req)" Margin="0,0,0,6">
+                                <StackPanel Margin="4">
+
+                                    <!-- Customer / entitlement inputs -->
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Label Grid.Row="0" Grid.Column="0"
+                                               Content="Entitlement Code" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1"
+                                                 Text="{Binding EntitlementCode, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                        <Label Grid.Row="1" Grid.Column="0"
+                                               Content="Cliente" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Text="{Binding CustomerName, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                        <Label Grid.Row="2" Grid.Column="0"
+                                               Content="RFC / Tax ID" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="2" Grid.Column="1"
+                                                 Text="{Binding TaxId, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                        <Label Grid.Row="3" Grid.Column="0"
+                                               Content="Email" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="3" Grid.Column="1"
+                                                 Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                    </Grid>
+
+                                    <TextBlock Text="Producto y Versión se toman de la sección Validate License"
+                                               FontStyle="Italic" Foreground="Gray"
+                                               FontSize="11" Margin="0,0,0,4"/>
+
+                                    <!-- Action buttons -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Button x:Name="BtnGenReq"
+                                                Content="Generar .req"
+                                                Command="{Binding GenerateRequestCommand}"
+                                                IsEnabled="{Binding IsNotBusy}"
+                                                Margin="0,0,6,0" Padding="8,3"/>
+                                        <Button Content="Guardar .req"
+                                                Command="{Binding SaveRequestFileCommand}"
+                                                IsEnabled="{Binding IsNotBusy}"
+                                                Padding="8,3"/>
+                                    </StackPanel>
+
+                                    <!-- JSON preview -->
+                                    <TextBox Text="{Binding GeneratedJson, Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="11"
+                                             Height="90" TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"
+                                             Background="#F5F5F5"/>
+
+                                </StackPanel>
                             </GroupBox>
 
                             <!-- 5. Install License -->
