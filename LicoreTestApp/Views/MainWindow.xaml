@@ -107,11 +107,73 @@
 
                             <!-- 3. Validate License -->
                             <GroupBox Header="Validate License" Margin="0,0,0,6">
-                                <Button x:Name="BtnValidateFull"
-                                        Content="Validate Full"
-                                        IsEnabled="{Binding IsNotBusy}"
-                                        HorizontalAlignment="Left"
-                                        Margin="4" Padding="8,3"/>
+                                <StackPanel Margin="4">
+
+                                    <!-- Product / version inputs -->
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Label Grid.Row="0" Grid.Column="0" Content="Producto"
+                                               VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1"
+                                                 Text="{Binding ProductName, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                        <Label Grid.Row="1" Grid.Column="0" Content="Versión"
+                                               VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Text="{Binding ProductVersion, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,2" Padding="2"/>
+                                    </Grid>
+
+                                    <!-- Test env vars (collapsed by default) -->
+                                    <Expander Header="Variables de entorno de test (opcional)"
+                                              IsExpanded="False" Margin="0,0,0,4">
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Label Grid.Row="0" Grid.Column="0"
+                                                   Content="LICORE_TEST_FINGERPRINT"
+                                                   VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1"
+                                                     Text="{Binding TestFingerprint, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" FontSize="11"
+                                                     Margin="0,2" Padding="2"/>
+                                            <Label Grid.Row="1" Grid.Column="0"
+                                                   Content="LICORE_TEST_TODAY"
+                                                   VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1"
+                                                     Text="{Binding TestToday, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" FontSize="11"
+                                                     Margin="0,2" Padding="2"/>
+                                        </Grid>
+                                    </Expander>
+
+                                    <!-- Action buttons -->
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="BtnValidateFull"
+                                                Content="Validate Full"
+                                                Command="{Binding ValidateFullCommand}"
+                                                IsEnabled="{Binding IsNotBusy}"
+                                                Margin="0,0,6,0" Padding="8,3"/>
+                                        <Button Content="Validate Cached"
+                                                Command="{Binding ValidateCachedCommand}"
+                                                IsEnabled="{Binding IsNotBusy}"
+                                                Padding="8,3"/>
+                                    </StackPanel>
+
+                                </StackPanel>
                             </GroupBox>
 
                             <!-- 4. Generate Request -->

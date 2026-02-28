@@ -65,6 +65,46 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set { if (_selectedReasonCode == value) return; _selectedReasonCode = value; OnPropertyChanged(); }
     }
 
+    private string _productName = "GENERADOR_NOTAS";
+
+    /// <summary>Product identifier passed to lc_validate_full / lc_validate_cached.</summary>
+    public string ProductName
+    {
+        get => _productName;
+        set { if (_productName == value) return; _productName = value; OnPropertyChanged(); }
+    }
+
+    private string _productVersion = "2.0.0";
+
+    /// <summary>Product version passed to lc_validate_full / lc_validate_cached.</summary>
+    public string ProductVersion
+    {
+        get => _productVersion;
+        set { if (_productVersion == value) return; _productVersion = value; OnPropertyChanged(); }
+    }
+
+    private string _testFingerprint = string.Empty;
+
+    /// <summary>
+    /// When non-empty, set as <c>LICORE_TEST_FINGERPRINT</c> env var before validation calls.
+    /// </summary>
+    public string TestFingerprint
+    {
+        get => _testFingerprint;
+        set { if (_testFingerprint == value) return; _testFingerprint = value; OnPropertyChanged(); }
+    }
+
+    private string _testToday = string.Empty;
+
+    /// <summary>
+    /// When non-empty, set as <c>LICORE_TEST_TODAY</c> env var before validation calls.
+    /// </summary>
+    public string TestToday
+    {
+        get => _testToday;
+        set { if (_testToday == value) return; _testToday = value; OnPropertyChanged(); }
+    }
+
     private string _statusMessage = "Listo.";
 
     /// <summary>One-line status displayed in the window footer StatusBar.</summary>
@@ -90,6 +130,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Calls lc_reason_message(<see cref="SelectedReasonCode"/>) and logs the result.</summary>
     public ICommand ReasonMessageCommand { get; }
 
+    /// <summary>
+    /// Validates <see cref="ProductName"/>/<see cref="ProductVersion"/> via lc_validate_full.
+    /// Applies optional test env vars before calling.
+    /// </summary>
+    public ICommand ValidateFullCommand { get; }
+
+    /// <summary>
+    /// Validates <see cref="ProductName"/>/<see cref="ProductVersion"/> via lc_validate_cached.
+    /// Applies optional test env vars before calling.
+    /// </summary>
+    public ICommand ValidateCachedCommand { get; }
+
     private readonly RelayCommand _copyLogCmd;
 
     /// <summary>
@@ -105,6 +157,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ClearLogCommand       = new RelayCommand(_ => ClearLog());
         PingCommand           = new RelayCommand(_ => ExecutePing());
         ReasonMessageCommand  = new RelayCommand(_ => ExecuteReasonMessage());
+        ValidateFullCommand   = new RelayCommand(_ => ExecuteValidate(cached: false));
+        ValidateCachedCommand = new RelayCommand(_ => ExecuteValidate(cached: true));
         _copyLogCmd           = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
 
         Results.CollectionChanged += OnResultsChanged;
@@ -199,6 +253,72 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Log(new TestResult
             {
                 FunctionName = "lc_reason_message",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ExecuteValidate(bool cached)
+    {
+        string fnName = cached ? "lc_validate_cached" : "lc_validate_full";
+
+        if (string.IsNullOrWhiteSpace(ProductName) || string.IsNullOrWhiteSpace(ProductVersion))
+        {
+            Log(new TestResult
+            {
+                FunctionName = fnName,
+                ApiResult    = LicoreApi.LcResult.InvalidArgument,
+                Detail       = "ProductName y ProductVersion son obligatorios.",
+                Timestamp    = DateTime.Now,
+            });
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(TestFingerprint))
+            Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT", TestFingerprint);
+        if (!string.IsNullOrEmpty(TestToday))
+            Environment.SetEnvironmentVariable("LICORE_TEST_TODAY", TestToday);
+
+        IsBusy = true;
+        try
+        {
+            var (apiResult, reason) = cached
+                ? LicoreApi.ValidateCached(ProductName, ProductVersion)
+                : LicoreApi.ValidateFull(ProductName, ProductVersion);
+
+            string? msg = LicoreApi.GetReasonMessage((int)reason);
+
+            Log(new TestResult
+            {
+                FunctionName  = fnName,
+                ApiResult     = apiResult,
+                ReasonCode    = reason,
+                ReasonMessage = msg,
+                Detail        = cached ? "(cached)" : null,
+                Timestamp     = DateTime.Now,
+            });
+        }
+        catch (SEHException ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = fnName,
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = fnName,
                 ApiResult    = LicoreApi.LcResult.InternalError,
                 Detail       = ex.Message,
                 Timestamp    = DateTime.Now,

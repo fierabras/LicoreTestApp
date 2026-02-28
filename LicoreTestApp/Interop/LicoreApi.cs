@@ -176,4 +176,22 @@ public static class LicoreApi
         int rc = lc_reason_message(reasonCode, out IntPtr ptr);
         return rc == (int)LcResult.Ok ? Marshal.PtrToStringAnsi(ptr) : null;
     }
+
+    /// <summary>
+    /// Calls <c>lc_validate_full</c> and returns a tuple of (ApiResult, Reason).
+    /// </summary>
+    public static (LcResult ApiResult, LcReason Reason) ValidateFull(string productName, string version)
+    {
+        int rc = lc_validate_full(productName, version, out int reason);
+        return ((LcResult)rc, (LcReason)reason);
+    }
+
+    /// <summary>
+    /// Calls <c>lc_validate_cached</c> and returns a tuple of (ApiResult, Reason).
+    /// </summary>
+    public static (LcResult ApiResult, LcReason Reason) ValidateCached(string productName, string version)
+    {
+        int rc = lc_validate_cached(productName, version, out int reason);
+        return ((LcResult)rc, (LcReason)reason);
+    }
 }
