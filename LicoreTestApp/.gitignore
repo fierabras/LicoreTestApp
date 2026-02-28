@@ -1,0 +1,10 @@
+﻿# Build outputs
+bin/
+obj/
+
+# Rider
+.idea/
+*.DotSettings.user
+
+# licore artifacts — dll va en repo solo si el equipo lo decide
+# licore.dll   ← descomentar si NO quieren versionar la DLL
