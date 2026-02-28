@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
@@ -154,6 +155,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         private set { if (_generatedJson == value) return; _generatedJson = value; OnPropertyChanged(); }
     }
 
+    private string _licensePath = string.Empty;
+
+    /// <summary>Path to the .lic file selected via <see cref="BrowseLicenseCommand"/>.</summary>
+    public string LicensePath
+    {
+        get => _licensePath;
+        set { if (_licensePath == value) return; _licensePath = value; OnPropertyChanged(); }
+    }
+
     private string _statusMessage = "Listo.";
 
     /// <summary>One-line status displayed in the window footer StatusBar.</summary>
@@ -190,6 +200,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand SaveRequestFileCommand { get; }
 
     /// <summary>
+    /// Opens an OpenFileDialog and populates <see cref="LicensePath"/>. Does not call the DLL.
+    /// </summary>
+    public ICommand BrowseLicenseCommand { get; }
+
+    /// <summary>
+    /// Installs the .lic at <see cref="LicensePath"/> and runs a post-install lc_validate_full.
+    /// </summary>
+    public ICommand InstallLicenseCommand { get; }
+
+    /// <summary>
     /// Validates <see cref="ProductName"/>/<see cref="ProductVersion"/> via lc_validate_full.
     /// Applies optional test env vars before calling.
     /// </summary>
@@ -218,6 +238,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ReasonMessageCommand  = new RelayCommand(_ => ExecuteReasonMessage());
         GenerateRequestCommand = new RelayCommand(_ => ExecuteGenerateRequest());
         SaveRequestFileCommand = new RelayCommand(_ => ExecuteSaveRequestFile());
+        BrowseLicenseCommand   = new RelayCommand(_ => ExecuteBrowseLicense());
+        InstallLicenseCommand  = new RelayCommand(_ => ExecuteInstallLicense());
         ValidateFullCommand    = new RelayCommand(_ => ExecuteValidate(cached: false));
         ValidateCachedCommand  = new RelayCommand(_ => ExecuteValidate(cached: true));
         _copyLogCmd           = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
@@ -314,6 +336,99 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Log(new TestResult
             {
                 FunctionName = "lc_reason_message",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ExecuteBrowseLicense()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "License file (*.lic)|*.lic",
+            Title  = "Seleccionar licencia",
+        };
+        if (dlg.ShowDialog() == true)
+            LicensePath = dlg.FileName;
+    }
+
+    private void ExecuteInstallLicense()
+    {
+        if (string.IsNullOrWhiteSpace(LicensePath))
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_install_license",
+                ApiResult    = LicoreApi.LcResult.InvalidArgument,
+                Detail       = "Selecciona un archivo .lic primero.",
+                Timestamp    = DateTime.Now,
+            });
+            return;
+        }
+
+        if (!File.Exists(LicensePath))
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_install_license",
+                ApiResult    = LicoreApi.LcResult.InvalidArgument,
+                Detail       = $"Archivo no encontrado: {LicensePath}",
+                Timestamp    = DateTime.Now,
+            });
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var (apiResult, reason) = LicoreApi.InstallLicense(LicensePath);
+            string? msg = LicoreApi.GetReasonMessage((int)reason);
+            Log(new TestResult
+            {
+                FunctionName  = "lc_install_license",
+                ApiResult     = apiResult,
+                ReasonCode    = reason,
+                ReasonMessage = msg,
+                Detail        = Path.GetFileName(LicensePath),
+                Timestamp     = DateTime.Now,
+            });
+
+            // Post-install auto-validate
+            if (apiResult == LicoreApi.LcResult.Ok && reason == LicoreApi.LcReason.Ok)
+            {
+                var (vResult, vReason) = LicoreApi.ValidateFull(ProductName, ProductVersion);
+                string? vMsg = LicoreApi.GetReasonMessage((int)vReason);
+                Log(new TestResult
+                {
+                    FunctionName  = "lc_validate_full (post-install)",
+                    ApiResult     = vResult,
+                    ReasonCode    = vReason,
+                    ReasonMessage = vMsg,
+                    Timestamp     = DateTime.Now,
+                });
+            }
+        }
+        catch (SEHException ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_install_license",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_install_license",
                 ApiResult    = LicoreApi.LcResult.InternalError,
                 Detail       = ex.Message,
                 Timestamp    = DateTime.Now,

@@ -219,6 +219,17 @@ public static class LicoreApi
     }
 
     /// <summary>
+    /// Installs a license file from <paramref name="licensePath"/> into the system license store.
+    /// Invalidates the DLL's internal validation cache.
+    /// Returns <c>(ApiResult, Reason)</c>.
+    /// </summary>
+    public static (LcResult ApiResult, LcReason Reason) InstallLicense(string licensePath)
+    {
+        int rc = lc_install_license(licensePath, out int reason);
+        return ((LcResult)rc, (LcReason)reason);
+    }
+
+    /// <summary>
     /// Calls <c>lc_validate_full</c> and returns a tuple of (ApiResult, Reason).
     /// </summary>
     public static (LcResult ApiResult, LcReason Reason) ValidateFull(string productName, string version)
