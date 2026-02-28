@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using LicoreTestApp.Interop;
+using LicoreTestApp.ViewModels;
 
 namespace LicoreTestApp.Views;
 
@@ -9,6 +10,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DataContext = new MainViewModel();
 
         // ── Smoke test: ping + version ────────────────────────────────────────
         int pingResult = LicoreApi.lc_ping();

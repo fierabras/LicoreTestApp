@@ -1,12 +1,173 @@
-﻿<Window x:Class="LicoreTestApp.Views.MainWindow"
+<Window x:Class="LicoreTestApp.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:LicoreTestApp.Views"
+        xmlns:vm="clr-namespace:LicoreTestApp.ViewModels"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
-        
-    </Grid>
+        Title="LicoreTestApp — RF28022026-A" Height="620" Width="1050">
+
+    <Window.Resources>
+        <vm:FirstNonNullConverter x:Key="FirstNonNull"/>
+    </Window.Resources>
+
+    <DockPanel>
+
+        <!-- ── Footer status bar ──────────────────────────────────────────── -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <TextBlock Text="{Binding StatusMessage}" Padding="4,0"/>
+        </StatusBar>
+
+        <!-- ── Main content: 40 / 60 split ───────────────────────────────── -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="3*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ── Left panel: API controls ─────────────────────────────── -->
+            <GroupBox Grid.Column="0" Header="Controles API" Margin="6,6,3,6">
+                <DockPanel LastChildFill="True">
+
+                    <!-- Utility buttons pinned to the bottom -->
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                                Margin="0,6,0,0" HorizontalAlignment="Left">
+                        <Button Content="Limpiar Log"
+                                Command="{Binding ClearLogCommand}"
+                                Width="100" Margin="0,0,6,0"/>
+                        <Button Content="Copiar Log"
+                                Command="{Binding CopyLogCommand}"
+                                Width="100"/>
+                    </StackPanel>
+
+                    <!-- Scrollable section list -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="0,4,0,0">
+
+                            <!-- 1. Ping / Version -->
+                            <GroupBox Header="Ping / Version" Margin="0,0,0,6">
+                                <Button x:Name="BtnPing"
+                                        Content="Ejecutar Ping"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        HorizontalAlignment="Left"
+                                        Margin="4" Padding="8,3"/>
+                            </GroupBox>
+
+                            <!-- 2. Reason Message -->
+                            <GroupBox Header="Reason Message" Margin="0,0,0,6">
+                                <Button x:Name="BtnReason"
+                                        Content="Consultar Reason"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        HorizontalAlignment="Left"
+                                        Margin="4" Padding="8,3"/>
+                            </GroupBox>
+
+                            <!-- 3. Validate License -->
+                            <GroupBox Header="Validate License" Margin="0,0,0,6">
+                                <Button x:Name="BtnValidateFull"
+                                        Content="Validate Full"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        HorizontalAlignment="Left"
+                                        Margin="4" Padding="8,3"/>
+                            </GroupBox>
+
+                            <!-- 4. Generate Request -->
+                            <GroupBox Header="Generate Request" Margin="0,0,0,6">
+                                <Button x:Name="BtnGenReq"
+                                        Content="Generar .req"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        HorizontalAlignment="Left"
+                                        Margin="4" Padding="8,3"/>
+                            </GroupBox>
+
+                            <!-- 5. Install License -->
+                            <GroupBox Header="Install License" Margin="0,0,0,6">
+                                <Button x:Name="BtnInstall"
+                                        Content="Instalar .lic"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        HorizontalAlignment="Left"
+                                        Margin="4" Padding="8,3"/>
+                            </GroupBox>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </GroupBox>
+
+            <!-- ── Right panel: results log ──────────────────────────────── -->
+            <GroupBox Grid.Column="1" Header="Log de Resultados" Margin="3,6,6,6">
+                <ListView ItemsSource="{Binding Results}" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+
+                    <!-- Row background by IsSuccess -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                    <Setter Property="Background" Value="#E8F5E9"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSuccess}" Value="False">
+                                    <Setter Property="Background" Value="#FFEBEE"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+
+                    <ListView.View>
+                        <GridView>
+
+                            <!-- Hora -->
+                            <GridViewColumn Header="Hora" Width="68">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm:ss}"
+                                                   FontFamily="Consolas" FontSize="12"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <!-- Función -->
+                            <GridViewColumn Header="Función" Width="130">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding FunctionName}"
+                                                   FontFamily="Consolas" FontSize="12"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <!-- Resultado -->
+                            <GridViewColumn Header="Resultado" Width="110">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding ApiResult}"
+                                                   FontFamily="Consolas" FontSize="12"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <!-- Detalle: ReasonMessage ?? Detail -->
+                            <GridViewColumn Header="Detalle" Width="280">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock FontFamily="Consolas" FontSize="12">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{StaticResource FirstNonNull}">
+                                                    <Binding Path="ReasonMessage"/>
+                                                    <Binding Path="Detail"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </GroupBox>
+
+        </Grid>
+    </DockPanel>
 </Window>
