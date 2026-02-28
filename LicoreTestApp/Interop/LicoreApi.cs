@@ -154,6 +154,11 @@ public static class LicoreApi
     // ── Managed helpers ───────────────────────────────────────────────────────
 
     /// <summary>
+    /// Calls <c>lc_ping()</c> and returns the result as <see cref="LcResult"/>.
+    /// </summary>
+    public static LcResult Ping() => (LcResult)lc_ping();
+
+    /// <summary>
     /// Returns the library version string (e.g. <c>"0.1.0"</c>).
     /// Wraps <c>lc_version()</c>; the underlying static memory is not freed.
     /// </summary>

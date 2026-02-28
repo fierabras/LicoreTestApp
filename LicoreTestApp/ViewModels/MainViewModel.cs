@@ -3,9 +3,11 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using LicoreTestApp.Interop;
 using LicoreTestApp.Models;
 
 namespace LicoreTestApp.ViewModels;
@@ -54,6 +56,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Inverse of <see cref="IsBusy"/>; bound to <c>IsEnabled</c> on the API buttons.</summary>
     public bool IsNotBusy => !_isBusy;
 
+    private int _selectedReasonCode;
+
+    /// <summary>Reason code to query via <c>lc_reason_message</c>; default 0 (LC_OK).</summary>
+    public int SelectedReasonCode
+    {
+        get => _selectedReasonCode;
+        set { if (_selectedReasonCode == value) return; _selectedReasonCode = value; OnPropertyChanged(); }
+    }
+
     private string _statusMessage = "Listo.";
 
     /// <summary>One-line status displayed in the window footer StatusBar.</summary>
@@ -73,6 +84,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Clears all entries from <see cref="Results"/> and resets the status line.</summary>
     public ICommand ClearLogCommand { get; }
 
+    /// <summary>Calls lc_ping() and lc_version() and logs both results in one row.</summary>
+    public ICommand PingCommand { get; }
+
+    /// <summary>Calls lc_reason_message(<see cref="SelectedReasonCode"/>) and logs the result.</summary>
+    public ICommand ReasonMessageCommand { get; }
+
     private readonly RelayCommand _copyLogCmd;
 
     /// <summary>
@@ -85,8 +102,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        ClearLogCommand = new RelayCommand(_ => ClearLog());
-        _copyLogCmd     = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
+        ClearLogCommand       = new RelayCommand(_ => ClearLog());
+        PingCommand           = new RelayCommand(_ => ExecutePing());
+        ReasonMessageCommand  = new RelayCommand(_ => ExecuteReasonMessage());
+        _copyLogCmd           = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
 
         Results.CollectionChanged += OnResultsChanged;
     }
@@ -102,6 +121,93 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Results.Add(result);
         StatusMessage = $"{result.Timestamp:HH:mm:ss}  {result.FunctionName}: {result.ApiResult}" +
                         (result.ReasonCode.HasValue ? $"  ({result.ReasonCode})" : string.Empty);
+    }
+
+    // ── H3 command implementations ────────────────────────────────────────────
+
+    private void ExecutePing()
+    {
+        IsBusy = true;
+        try
+        {
+            LicoreApi.LcResult result = LicoreApi.Ping();
+            string version = LicoreApi.GetVersion();
+            Log(new TestResult
+            {
+                FunctionName = "lc_ping/lc_version",
+                ApiResult    = result,
+                Detail       = $"version={version}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (SEHException ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_ping/lc_version",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_ping/lc_version",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ExecuteReasonMessage()
+    {
+        IsBusy = true;
+        try
+        {
+            string? msg      = LicoreApi.GetReasonMessage(_selectedReasonCode);
+            LicoreApi.LcResult lcResult = msg is not null
+                ? LicoreApi.LcResult.Ok
+                : LicoreApi.LcResult.InvalidArgument;
+            Log(new TestResult
+            {
+                FunctionName  = "lc_reason_message",
+                ApiResult     = lcResult,
+                ReasonCode    = (LicoreApi.LcReason)_selectedReasonCode,
+                ReasonMessage = msg,
+                Timestamp     = DateTime.Now,
+            });
+        }
+        catch (SEHException ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_reason_message",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = $"SEHException: {ex.Message}",
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log(new TestResult
+            {
+                FunctionName = "lc_reason_message",
+                ApiResult    = LicoreApi.LcResult.InternalError,
+                Detail       = ex.Message,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

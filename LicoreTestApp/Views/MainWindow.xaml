@@ -5,6 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:LicoreTestApp.Views"
         xmlns:vm="clr-namespace:LicoreTestApp.ViewModels"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="LicoreTestApp — RF28022026-A" Height="620" Width="1050">
 
@@ -49,6 +50,7 @@
                             <GroupBox Header="Ping / Version" Margin="0,0,0,6">
                                 <Button x:Name="BtnPing"
                                         Content="Ejecutar Ping"
+                                        Command="{Binding PingCommand}"
                                         IsEnabled="{Binding IsNotBusy}"
                                         HorizontalAlignment="Left"
                                         Margin="4" Padding="8,3"/>
@@ -56,11 +58,51 @@
 
                             <!-- 2. Reason Message -->
                             <GroupBox Header="Reason Message" Margin="0,0,0,6">
-                                <Button x:Name="BtnReason"
-                                        Content="Consultar Reason"
-                                        IsEnabled="{Binding IsNotBusy}"
-                                        HorizontalAlignment="Left"
-                                        Margin="4" Padding="8,3"/>
+                                <StackPanel Margin="4">
+                                    <ComboBox SelectedValue="{Binding SelectedReasonCode}"
+                                              SelectedValuePath="Tag"
+                                              Margin="0,0,0,4">
+                                        <ComboBoxItem Content="0 — LC_OK">
+                                            <ComboBoxItem.Tag><sys:Int32>0</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="10 — LC_MISSING_LICENSE">
+                                            <ComboBoxItem.Tag><sys:Int32>10</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="11 — LC_INVALID_FORMAT">
+                                            <ComboBoxItem.Tag><sys:Int32>11</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="12 — LC_TAMPERED_SIGNATURE">
+                                            <ComboBoxItem.Tag><sys:Int32>12</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="13 — LC_WRONG_VENDOR_OR_FAMILY">
+                                            <ComboBoxItem.Tag><sys:Int32>13</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="14 — LC_WRONG_PRODUCT">
+                                            <ComboBoxItem.Tag><sys:Int32>14</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="15 — LC_DEVICE_MISMATCH">
+                                            <ComboBoxItem.Tag><sys:Int32>15</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="16 — LC_EXPIRED">
+                                            <ComboBoxItem.Tag><sys:Int32>16</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="17 — LC_CLOCK_ROLLBACK">
+                                            <ComboBoxItem.Tag><sys:Int32>17</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="18 — LC_IO_ERROR">
+                                            <ComboBoxItem.Tag><sys:Int32>18</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                        <ComboBoxItem Content="19 — LC_INTERNAL_ERROR">
+                                            <ComboBoxItem.Tag><sys:Int32>19</sys:Int32></ComboBoxItem.Tag>
+                                        </ComboBoxItem>
+                                    </ComboBox>
+                                    <Button x:Name="BtnReason"
+                                            Content="Consultar Reason"
+                                            Command="{Binding ReasonMessageCommand}"
+                                            IsEnabled="{Binding IsNotBusy}"
+                                            HorizontalAlignment="Left"
+                                            Padding="8,3"/>
+                                </StackPanel>
                             </GroupBox>
 
                             <!-- 3. Validate License -->
