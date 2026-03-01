@@ -17,7 +17,13 @@
 
         <!-- ── Footer status bar ──────────────────────────────────────────── -->
         <StatusBar DockPanel.Dock="Bottom">
-            <TextBlock Text="{Binding StatusMessage}" Padding="4,0"/>
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" Padding="4,0"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding Results.Count, StringFormat='Entradas: {0}'}" Padding="4,0"/>
+            </StatusBarItem>
         </StatusBar>
 
         <!-- ── Main content: 40 / 60 split ───────────────────────────────── -->
@@ -285,6 +291,24 @@
                                             HorizontalAlignment="Left"
                                             Padding="8,3"/>
 
+                                </StackPanel>
+                            </GroupBox>
+
+                            <Separator Margin="0,8"/>
+
+                            <!-- Run All -->
+                            <GroupBox Header="Ejecución completa" Margin="0,0,0,6">
+                                <StackPanel Margin="4">
+                                    <Button Content="▶ Run All"
+                                            Command="{Binding RunAllCommand}"
+                                            IsEnabled="{Binding IsNotBusy}"
+                                            FontWeight="Bold"
+                                            HorizontalAlignment="Stretch"
+                                            Padding="8,5"/>
+                                    <TextBlock Text="{Binding RunAllSummary}"
+                                               FontFamily="Consolas" FontSize="12"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,4"/>
                                 </StackPanel>
                             </GroupBox>
 
