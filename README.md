@@ -2,7 +2,7 @@
 
 ## Requisitos
 - Windows x64
-- .NET 8 Runtime
+- .NET 9 Runtime
 - licore.dll (Release x64) en el mismo directorio que el ejecutable
 
 ## Uso rápido
