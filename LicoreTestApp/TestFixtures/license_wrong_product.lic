@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "alg": "PENDIENTE",
+  "kid": "PENDIENTE",
+  "payload": {
+    "vendor_id": "impulso-informatico",
+    "family_id": "desktop-suite",
+    "issued_at": "2026-02-20T00:00:00Z",
+    "customer": {"id": 1, "tax_id": "X", "name": "X", "email": "x@example.com"},
+    "product": {"id": 1, "product_name": "APPY", "version": "2.0.0", "specifications": ""},
+    "subscription": {"id": 1, "type": "YEARLY", "start_date": "2026-01-01", "finish_date": "2026-12-31", "status": "ACTIVE"},
+    "licence": {"id": 1, "serial_number": "LC-000001", "type": "STANDARD", "emission_date": "2026-01-01", "expiration_date": "2026-12-31", "status": "ACTIVE", "specifications": ""},
+    "activation": {"id": 1, "type": "INITIAL", "activation_date": "2026-02-20T00:00:00Z", "status": "ACTIVE", "details": ""},
+    "device_binding": {"binding_type": "fingerprint_sha512", "fingerprint": "FINGERPRINT_OK"}
+  },
+  "signature": "PENDIENTE"
+}

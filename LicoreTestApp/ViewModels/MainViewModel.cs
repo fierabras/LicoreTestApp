@@ -97,6 +97,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set { if (_testToday == value) return; _testToday = value; OnPropertyChanged(); }
     }
 
+    private string _testBasedir = string.Empty;
+    /// <summary>When non-empty, set as <c>LICORE_TEST_BASEDIR</c> to redirect license store away from real ProgramData.</summary>
+    public string TestBasedir
+    {
+        get => _testBasedir;
+        set { if (_testBasedir == value) return; _testBasedir = value; OnPropertyChanged(); }
+    }
+
+    private string _testNowEpoch = string.Empty;
+    /// <summary>When non-empty, set as <c>LICORE_TEST_NOW_EPOCH</c> (Unix seconds) to control anti-rollback.</summary>
+    public string TestNowEpoch
+    {
+        get => _testNowEpoch;
+        set { if (_testNowEpoch == value) return; _testNowEpoch = value; OnPropertyChanged(); }
+    }
+
     private string _entitlementCode = "ENT-0001";
     /// <summary>Entitlement / SKU code passed to lc_generate_request.</summary>
     public string EntitlementCode
@@ -153,6 +169,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         private set { if (_runAllSummary == value) return; _runAllSummary = value; OnPropertyChanged(); }
     }
 
+    /// <summary>Results from the negative-test suite (VF scenarios).</summary>
+    public ObservableCollection<NegativeTestResult> NegativeTestResults { get; } = new();
+
+    private string _negativeSummary = string.Empty;
+    /// <summary>Summary after running negative cases, e.g. "12/12 PASS".</summary>
+    public string NegativeSummary
+    {
+        get => _negativeSummary;
+        private set { if (_negativeSummary == value) return; _negativeSummary = value; OnPropertyChanged(); }
+    }
+
     private string _statusMessage = "Listo.";
     /// <summary>One-line status displayed in the window footer StatusBar.</summary>
     public string StatusMessage
@@ -198,6 +225,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Executes all test steps in sequence; continues past individual failures.</summary>
     public ICommand RunAllCommand { get; }
 
+    /// <summary>Runs all predefined VF negative-test scenarios in isolated temp directories.</summary>
+    public ICommand RunAllNegativeCasesCommand { get; }
+
     private readonly RelayCommand _copyLogCmd;
 
     /// <summary>
@@ -219,8 +249,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         InstallLicenseCommand  = new RelayCommand(_ => ExecuteInstallLicense());
         ValidateFullCommand    = new RelayCommand(_ => ExecuteValidate(cached: false));
         ValidateCachedCommand  = new RelayCommand(_ => ExecuteValidate(cached: true));
-        RunAllCommand          = new RelayCommand(_ => ExecuteRunAll());
-        _copyLogCmd            = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
+        RunAllCommand                = new RelayCommand(_ => ExecuteRunAll());
+        RunAllNegativeCasesCommand   = new RelayCommand(_ => ExecuteRunAllNegativeCases());
+        _copyLogCmd                  = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
 
         Results.CollectionChanged += OnResultsChanged;
     }
@@ -272,6 +303,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT", TestFingerprint);
         if (!string.IsNullOrEmpty(TestToday))
             Environment.SetEnvironmentVariable("LICORE_TEST_TODAY", TestToday);
+        if (!string.IsNullOrEmpty(TestBasedir))
+            Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR", TestBasedir);
+        if (!string.IsNullOrEmpty(TestNowEpoch))
+            Environment.SetEnvironmentVariable("LICORE_TEST_NOW_EPOCH", TestNowEpoch);
     }
 
     private TestResult ExecValidateFull(string fnName = "lc_validate_full")
@@ -501,6 +536,92 @@ public sealed class MainViewModel : INotifyPropertyChanged
         catch (SEHException ex) { Log(ErrorResult("lc_install_license", $"SEHException: {ex.Message}")); }
         catch (Exception    ex) { Log(ErrorResult("lc_install_license", ex.Message)); }
         finally { IsBusy = false; }
+    }
+
+    // ── Negative test cases (VF scenarios from integration-reference.md) ─────
+
+    private static readonly NegativeTestCase[] _negativeCases =
+    [
+        new("VF-01", "Firma valida",                  "license_signed_valid.lic",            "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.Ok),
+        new("VF-02", "Sin licencia (basedir vacio)",  null,                                  "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.MissingLicense),
+        new("VF-03", "JSON invalido",                 "license_invalid_json.lic",            "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.InvalidFormat),
+        new("VF-04", "Fecha invalida",                "license_signed_invalid_date.lic",     "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.InvalidFormat),
+        new("VF-05", "Firma invalida",                "license_signed_bad_signature.lic",    "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.TamperedSignature),
+        new("VF-06", "Payload alterado",              "license_signed_tampered_payload.lic", "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.TamperedSignature),
+        new("VF-07", "Kid desconocido",               "license_signed_wrong_kid.lic",        "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.TamperedSignature),
+        new("VF-08", "Vendor/family incorrecto",      "license_signed_wrong_vendor.lic",     "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.WrongVendorOrFamily),
+        new("VF-09", "Producto incorrecto",           "license_signed_wrong_product.lic",    "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.WrongProduct),
+        new("VF-10", "Device mismatch",               "license_signed_wrong_device.lic",     "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.DeviceMismatch),
+        new("VF-11", "Licencia vencida",              "license_signed_expired.lic",          "FINGERPRINT_OK", "2027-01-01", "APPX", "1.0.0", LicoreApi.LcReason.Expired),
+        new("VF-12", "Keys reordenadas (canonical)",  "license_signed_valid_reordered.lic",  "FINGERPRINT_OK", "2026-02-22", "APPX", "1.0.0", LicoreApi.LcReason.Ok),
+    ];
+
+    private void ExecuteRunAllNegativeCases()
+    {
+        IsBusy = true;
+        NegativeTestResults.Clear();
+        NegativeSummary = "Ejecutando...";
+
+        string fixturesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFixtures");
+        int pass = 0;
+
+        try
+        {
+            foreach (var tc in _negativeCases)
+            {
+                string tempDir = Path.Combine(Path.GetTempPath(), $"licore_neg_{Guid.NewGuid():N}");
+                Directory.CreateDirectory(tempDir);
+                bool passed = false;
+                LicoreApi.LcReason actualReason = LicoreApi.LcReason.InternalError;
+                string actualMessage = string.Empty;
+
+                try
+                {
+                    if (tc.FixtureFileName is not null)
+                    {
+                        string src = Path.Combine(fixturesDir, tc.FixtureFileName);
+                        File.Copy(src, Path.Combine(tempDir, "license.lic"), overwrite: true);
+                    }
+
+                    Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR",      tempDir);
+                    Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT",  tc.Fingerprint);
+                    Environment.SetEnvironmentVariable("LICORE_TEST_TODAY",        tc.Today);
+
+                    var (apiResult, reason) = LicoreApi.ValidateFull(tc.ProductName, tc.ProductVersion);
+                    actualReason  = reason;
+                    actualMessage = LicoreApi.GetReasonMessage((int)reason) ?? reason.ToString();
+                    passed        = apiResult == LicoreApi.LcResult.Ok && reason == tc.ExpectedReason;
+                }
+                catch (SEHException ex) { actualMessage = $"SEHException: {ex.Message}"; }
+                catch (Exception    ex) { actualMessage = ex.Message; }
+                finally
+                {
+                    Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR",     null);
+                    Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT", null);
+                    Environment.SetEnvironmentVariable("LICORE_TEST_TODAY",       null);
+                    try { Directory.Delete(tempDir, recursive: true); } catch { }
+                }
+
+                if (passed) pass++;
+                NegativeTestResults.Add(new NegativeTestResult
+                {
+                    Case          = tc,
+                    Passed        = passed,
+                    ActualReason  = actualReason,
+                    ActualMessage = actualMessage,
+                    Timestamp     = DateTime.Now,
+                });
+            }
+        }
+        finally
+        {
+            int total = _negativeCases.Length;
+            int fail  = total - pass;
+            NegativeSummary = fail == 0
+                ? $"{pass}/{total} PASS"
+                : $"{pass}/{total} PASS — {fail} FAIL";
+            IsBusy = false;
+        }
     }
 
     // ── RunAll ────────────────────────────────────────────────────────────────

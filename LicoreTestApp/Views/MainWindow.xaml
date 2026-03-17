@@ -7,7 +7,7 @@
         xmlns:vm="clr-namespace:LicoreTestApp.ViewModels"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
-        Title="LicoreTestApp — RF28022026-A" Height="620" Width="1050">
+        Title="LicoreTestApp — RF28022026-A" Height="780" Width="1050">
 
     <Window.Resources>
         <vm:FirstNonNullConverter x:Key="FirstNonNull"/>
@@ -148,6 +148,8 @@
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
                                             <Label Grid.Row="0" Grid.Column="0"
                                                    Content="LICORE_TEST_FINGERPRINT"
@@ -163,6 +165,22 @@
                                                      Text="{Binding TestToday, UpdateSourceTrigger=PropertyChanged}"
                                                      FontFamily="Consolas" FontSize="11"
                                                      Margin="0,2" Padding="2"/>
+                                            <Label Grid.Row="2" Grid.Column="0"
+                                                   Content="LICORE_TEST_BASEDIR"
+                                                   VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="2" Grid.Column="1"
+                                                     Text="{Binding TestBasedir, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" FontSize="11"
+                                                     Margin="0,2" Padding="2"
+                                                     ToolTip="Reemplaza %ProgramData%\impulso-informatico\desktop-suite\"/>
+                                            <Label Grid.Row="3" Grid.Column="0"
+                                                   Content="LICORE_TEST_NOW_EPOCH"
+                                                   VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="3" Grid.Column="1"
+                                                     Text="{Binding TestNowEpoch, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Consolas" FontSize="11"
+                                                     Margin="0,2" Padding="2"
+                                                     ToolTip="Unix epoch (segundos) para pruebas de anti-rollback"/>
                                         </Grid>
                                     </Expander>
 
@@ -317,78 +335,154 @@
                 </DockPanel>
             </GroupBox>
 
-            <!-- ── Right panel: results log ──────────────────────────────── -->
-            <GroupBox Grid.Column="1" Header="Log de Resultados" Margin="3,6,6,6">
-                <ListView ItemsSource="{Binding Results}" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+            <!-- ── Right panel: results log + negative cases ────────────── -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="230"/>
+                </Grid.RowDefinitions>
 
-                    <!-- Row background by IsSuccess -->
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSuccess}" Value="True">
-                                    <Setter Property="Background" Value="#E8F5E9"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding IsSuccess}" Value="False">
-                                    <Setter Property="Background" Value="#FFEBEE"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ListView.ItemContainerStyle>
+                <!-- Log de Resultados -->
+                <GroupBox Grid.Row="0" Header="Log de Resultados" Margin="3,6,6,3">
+                    <ListView ItemsSource="{Binding Results}" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
-                    <ListView.View>
-                        <GridView>
+                        <!-- Row background by IsSuccess -->
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                        <Setter Property="Background" Value="#E8F5E9"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSuccess}" Value="False">
+                                        <Setter Property="Background" Value="#FFEBEE"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListView.ItemContainerStyle>
 
-                            <!-- Hora -->
-                            <GridViewColumn Header="Hora" Width="68">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm:ss}"
-                                                   FontFamily="Consolas" FontSize="12"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Hora" Width="68">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm:ss}"
+                                                       FontFamily="Consolas" FontSize="12"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Función" Width="130">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding FunctionName}"
+                                                       FontFamily="Consolas" FontSize="12"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Resultado" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding ApiResult}"
+                                                       FontFamily="Consolas" FontSize="12"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Detalle" Width="280">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock FontFamily="Consolas" FontSize="12">
+                                                <TextBlock.Text>
+                                                    <MultiBinding Converter="{StaticResource FirstNonNull}">
+                                                        <Binding Path="ReasonMessage"/>
+                                                        <Binding Path="Detail"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </GroupBox>
 
-                            <!-- Función -->
-                            <GridViewColumn Header="Función" Width="130">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding FunctionName}"
-                                                   FontFamily="Consolas" FontSize="12"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
+                <!-- Casos Negativos (VF scenarios) -->
+                <GroupBox Grid.Row="1" Header="Casos Negativos — VF (validate_full contra golden files)" Margin="3,3,6,6">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,4,4,2">
+                            <Button Content="▶ Run All Negative Cases"
+                                    Command="{Binding RunAllNegativeCasesCommand}"
+                                    IsEnabled="{Binding IsNotBusy}"
+                                    Padding="8,3" Margin="0,0,10,0"/>
+                            <TextBlock Text="{Binding NegativeSummary}"
+                                       FontFamily="Consolas" FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ListView ItemsSource="{Binding NegativeTestResults}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Passed}" Value="True">
+                                            <Setter Property="Background" Value="#E8F5E9"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Passed}" Value="False">
+                                            <Setter Property="Background" Value="#FFEBEE"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="ID" Width="48">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Case.Id}"
+                                                           FontFamily="Consolas" FontSize="11"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Escenario" Width="150">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Case.Label}"
+                                                           FontFamily="Consolas" FontSize="11"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Esperado" Width="160">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding ExpectedLabel}"
+                                                           FontFamily="Consolas" FontSize="11"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Actual" Width="160">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding ActualLabel}"
+                                                           FontFamily="Consolas" FontSize="11"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="PASS/FAIL" Width="68">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           FontFamily="Consolas" FontSize="11"
+                                                           FontWeight="Bold"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </DockPanel>
+                </GroupBox>
 
-                            <!-- Resultado -->
-                            <GridViewColumn Header="Resultado" Width="110">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding ApiResult}"
-                                                   FontFamily="Consolas" FontSize="12"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-
-                            <!-- Detalle: ReasonMessage ?? Detail -->
-                            <GridViewColumn Header="Detalle" Width="280">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock FontFamily="Consolas" FontSize="12">
-                                            <TextBlock.Text>
-                                                <MultiBinding Converter="{StaticResource FirstNonNull}">
-                                                    <Binding Path="ReasonMessage"/>
-                                                    <Binding Path="Detail"/>
-                                                </MultiBinding>
-                                            </TextBlock.Text>
-                                        </TextBlock>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </GroupBox>
+            </Grid>
 
         </Grid>
     </DockPanel>
