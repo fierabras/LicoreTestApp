@@ -612,8 +612,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 {
                     if (tc.FixtureFileName is not null)
                     {
+                        // LICORE_TEST_BASEDIR acts as %ProgramData% replacement;
+                        // the DLL appends impulso-informatico/desktop-suite/license.lic to it.
+                        string licDir = Path.Combine(tempDir, "impulso-informatico", "desktop-suite");
+                        Directory.CreateDirectory(licDir);
                         string src = Path.Combine(fixturesDir, tc.FixtureFileName);
-                        File.Copy(src, Path.Combine(tempDir, "license.lic"), overwrite: true);
+                        File.Copy(src, Path.Combine(licDir, "license.lic"), overwrite: true);
                     }
 
                     Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR",      tempDir);
@@ -702,7 +706,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             string tempLic = Path.Combine(Path.GetTempPath(),
                 $"{ProductName}_{ProductVersion}_test_{DateTime.Now:HHmmss}.lic");
-            File.WriteAllText(tempLic, licJson, System.Text.Encoding.UTF8);
+            // UTF-8 without BOM — jsmn (used by licore.dll) fails if the file starts with the BOM bytes EF BB BF.
+            File.WriteAllText(tempLic, licJson, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             LicensePath = tempLic;
 
             Log(new TestResult
@@ -766,7 +771,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 string.IsNullOrWhiteSpace(IssueExpirationDate) ? null : IssueExpirationDate);
 
             tempLicFile = Path.Combine(Path.GetTempPath(), $"licore_e2e_{Guid.NewGuid():N}.lic");
-            File.WriteAllText(tempLicFile, licJson, System.Text.Encoding.UTF8);
+            // UTF-8 without BOM — jsmn fails if the file starts with EF BB BF.
+            File.WriteAllText(tempLicFile, licJson, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             LicensePath = tempLicFile;
 
             total++; ok++;
