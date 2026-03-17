@@ -11,6 +11,7 @@ using Microsoft.Win32;
 using System.Windows.Input;
 using LicoreTestApp.Interop;
 using LicoreTestApp.Models;
+using LicoreTestApp.Services;
 
 namespace LicoreTestApp.ViewModels;
 
@@ -111,6 +112,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => _testNowEpoch;
         set { if (_testNowEpoch == value) return; _testNowEpoch = value; OnPropertyChanged(); }
+    }
+
+    private string _testSkPemPath = Environment.GetEnvironmentVariable("LICORE_TEST_SK_PEM_PATH") ?? string.Empty;
+    /// <summary>
+    /// Path to the Ed25519 test private key PEM file (kid="k1").
+    /// Used by <see cref="IssueLicenseCommand"/> and the E2E autonomous flow.
+    /// Pre-populated from <c>LICORE_TEST_SK_PEM_PATH</c> env var if set.
+    /// </summary>
+    public string TestSkPemPath
+    {
+        get => _testSkPemPath;
+        set { if (_testSkPemPath == value) return; _testSkPemPath = value; OnPropertyChanged(); }
+    }
+
+    private string _issueExpirationDate = string.Empty;
+    /// <summary>Optional expiry date "YYYY-MM-DD" for the issued test .lic. Empty = 1 year from today.</summary>
+    public string IssueExpirationDate
+    {
+        get => _issueExpirationDate;
+        set { if (_issueExpirationDate == value) return; _issueExpirationDate = value; OnPropertyChanged(); }
     }
 
     private string _entitlementCode = "ENT-0001";
@@ -228,6 +249,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Runs all predefined VF negative-test scenarios in isolated temp directories.</summary>
     public ICommand RunAllNegativeCasesCommand { get; }
 
+    /// <summary>Issues a test .lic from <see cref="GeneratedJson"/> using the Ed25519 test key.</summary>
+    public ICommand IssueLicenseCommand { get; }
+
+    /// <summary>Opens a file dialog to locate the Ed25519 test private key PEM file.</summary>
+    public ICommand BrowseSkPemCommand { get; }
+
+    /// <summary>Runs the complete autonomous E2E flow: gen-req → issue-lic → install → validate.</summary>
+    public ICommand RunE2eAutonomousCommand { get; }
+
     private readonly RelayCommand _copyLogCmd;
 
     /// <summary>
@@ -251,6 +281,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ValidateCachedCommand  = new RelayCommand(_ => ExecuteValidate(cached: true));
         RunAllCommand                = new RelayCommand(_ => ExecuteRunAll());
         RunAllNegativeCasesCommand   = new RelayCommand(_ => ExecuteRunAllNegativeCases());
+        IssueLicenseCommand          = new RelayCommand(_ => ExecuteIssueLicense());
+        BrowseSkPemCommand           = new RelayCommand(_ => ExecuteBrowseSkPem());
+        RunE2eAutonomousCommand      = new RelayCommand(_ => ExecuteRunE2eAutonomous());
         _copyLogCmd                  = new RelayCommand(_ => CopyLog(), _ => Results.Count > 0);
 
         Results.CollectionChanged += OnResultsChanged;
@@ -620,6 +653,168 @@ public sealed class MainViewModel : INotifyPropertyChanged
             NegativeSummary = fail == 0
                 ? $"{pass}/{total} PASS"
                 : $"{pass}/{total} PASS — {fail} FAIL";
+            IsBusy = false;
+        }
+    }
+
+    // ── Issue .lic [TEST] ─────────────────────────────────────────────────────
+
+    private void ExecuteBrowseSkPem()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "PEM key file (*.pem)|*.pem|All files (*.*)|*.*",
+            Title  = "Seleccionar clave privada Ed25519 (test)",
+        };
+        if (dlg.ShowDialog() == true)
+            TestSkPemPath = dlg.FileName;
+    }
+
+    private void ExecuteIssueLicense()
+    {
+        if (string.IsNullOrEmpty(GeneratedJson))
+        {
+            Log(ErrorResult("lc_issue_license [TEST]",
+                "Sin .req generado. Ejecute primero 'Generar .req'.",
+                LicoreApi.LcResult.InvalidArgument));
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(TestSkPemPath))
+        {
+            Log(ErrorResult("lc_issue_license [TEST]", "TestSkPemPath es obligatorio.",
+                LicoreApi.LcResult.InvalidArgument));
+            return;
+        }
+        if (!File.Exists(TestSkPemPath))
+        {
+            Log(ErrorResult("lc_issue_license [TEST]",
+                $"Archivo PEM no encontrado: {TestSkPemPath}",
+                LicoreApi.LcResult.InvalidArgument));
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            string pem     = File.ReadAllText(TestSkPemPath);
+            string licJson = LocalLicIssuer.Issue(GeneratedJson, pem,
+                string.IsNullOrWhiteSpace(IssueExpirationDate) ? null : IssueExpirationDate);
+
+            string tempLic = Path.Combine(Path.GetTempPath(),
+                $"{ProductName}_{ProductVersion}_test_{DateTime.Now:HHmmss}.lic");
+            File.WriteAllText(tempLic, licJson, System.Text.Encoding.UTF8);
+            LicensePath = tempLic;
+
+            Log(new TestResult
+            {
+                FunctionName = "lc_issue_license [TEST]",
+                ApiResult    = LicoreApi.LcResult.Ok,
+                Detail       = tempLic,
+                Timestamp    = DateTime.Now,
+            });
+        }
+        catch (Exception ex) { Log(ErrorResult("lc_issue_license [TEST]", ex.Message)); }
+        finally { IsBusy = false; }
+    }
+
+    // ── E2E Autónomo ──────────────────────────────────────────────────────────
+
+    private void ExecuteRunE2eAutonomous()
+    {
+        if (string.IsNullOrWhiteSpace(ProductName)     ||
+            string.IsNullOrWhiteSpace(ProductVersion)  ||
+            string.IsNullOrWhiteSpace(EntitlementCode) ||
+            string.IsNullOrWhiteSpace(CustomerName))
+        {
+            Log(ErrorResult("E2E Autónomo",
+                "Producto, Versión, Entitlement y Cliente son obligatorios.",
+                LicoreApi.LcResult.InvalidArgument));
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(TestSkPemPath) || !File.Exists(TestSkPemPath))
+        {
+            Log(ErrorResult("E2E Autónomo",
+                "TestSkPemPath no apunta a un archivo PEM válido.",
+                LicoreApi.LcResult.InvalidArgument));
+            return;
+        }
+
+        IsBusy = true;
+        Results.Clear();
+        RunAllSummary = "Ejecutando E2E autónomo...";
+        int total = 0, ok = 0;
+
+        string tempBasedir = Path.Combine(Path.GetTempPath(), $"licore_e2e_{Guid.NewGuid():N}");
+        string? tempLicFile = null;
+
+        try
+        {
+            Directory.CreateDirectory(tempBasedir);
+
+            // Set overrides for the entire flow
+            Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR",     tempBasedir);
+            Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT", "FINGERPRINT_OK");
+
+            // 1 — lc_generate_request
+            RunStep(ref total, ref ok, "lc_generate_request", () => ExecGenerateRequest());
+            if (string.IsNullOrEmpty(GeneratedJson))
+                throw new InvalidOperationException("lc_generate_request falló; no se puede continuar.");
+
+            // 2 — Issue .lic locally [TEST]
+            string pem     = File.ReadAllText(TestSkPemPath);
+            string licJson = LocalLicIssuer.Issue(GeneratedJson, pem,
+                string.IsNullOrWhiteSpace(IssueExpirationDate) ? null : IssueExpirationDate);
+
+            tempLicFile = Path.Combine(Path.GetTempPath(), $"licore_e2e_{Guid.NewGuid():N}.lic");
+            File.WriteAllText(tempLicFile, licJson, System.Text.Encoding.UTF8);
+            LicensePath = tempLicFile;
+
+            total++; ok++;
+            Log(new TestResult
+            {
+                FunctionName = "lc_issue_license [TEST]",
+                ApiResult    = LicoreApi.LcResult.Ok,
+                Detail       = $"→ {Path.GetFileName(tempLicFile)}",
+                Timestamp    = DateTime.Now,
+            });
+
+            // 3 — lc_install_license (DLL installs into LICORE_TEST_BASEDIR)
+            var installResult = RunStep(ref total, ref ok, "lc_install_license",
+                () => ExecInstallLicense(tempLicFile));
+
+            if (installResult.ApiResult != LicoreApi.LcResult.Ok ||
+                installResult.ReasonCode  != LicoreApi.LcReason.Ok)
+                throw new InvalidOperationException(
+                    $"lc_install_license falló: {installResult.ReasonCode} — " +
+                    (installResult.ReasonMessage ?? installResult.Detail));
+
+            // 4 — lc_validate_full (E2E)
+            RunStep(ref total, ref ok, "lc_validate_full (E2E)", () =>
+            {
+                var (apiResult, reason) = LicoreApi.ValidateFull(ProductName, ProductVersion);
+                return new TestResult
+                {
+                    FunctionName  = "lc_validate_full (E2E)",
+                    ApiResult     = apiResult,
+                    ReasonCode    = reason,
+                    ReasonMessage = LicoreApi.GetReasonMessage((int)reason),
+                    Timestamp     = DateTime.Now,
+                };
+            });
+        }
+        catch (SEHException ex) { Log(ErrorResult("E2E Autónomo", $"SEHException: {ex.Message}")); }
+        catch (Exception    ex) { Log(ErrorResult("E2E Autónomo", ex.Message)); }
+        finally
+        {
+            Environment.SetEnvironmentVariable("LICORE_TEST_BASEDIR",     null);
+            Environment.SetEnvironmentVariable("LICORE_TEST_FINGERPRINT", null);
+            try { Directory.Delete(tempBasedir, recursive: true); } catch { }
+            // tempLicFile is kept; LicensePath still points to it for optional inspection.
+
+            int errors = total - ok;
+            RunAllSummary = errors == 0
+                ? $"E2E: {ok}/{total} OK"
+                : $"E2E: {ok}/{total} OK — {errors} error{(errors == 1 ? "" : "es")}";
             IsBusy = false;
         }
     }

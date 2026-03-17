@@ -21,4 +21,9 @@
       </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <!-- Ed25519 signing for local test .lic issuer — no native .NET Ed25519 API in .NET 9 -->
+      <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    </ItemGroup>
+
 </Project>
