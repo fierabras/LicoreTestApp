@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "vendor_id": "impulso-informatico",
+  "family_id": "desktop-suite",
+  "product": {
+    "product_name": "APPX",
+    "version": "1.0.0"
+  },
+  "entitlement_code": "ENT-0001",
+  "request": {
+    "request_id": "00000000-0000-4000-8000-000000000000",
+    "requested_at": "2026-02-22T00:00:00Z"
+  },
+  "customer_hint": {
+    "name": "Cliente",
+    "tax_id": "RFC123",
+    "email": "a@b.com"
+  },
+  "device_binding": {
+    "binding_type": "fingerprint_sha512",
+    "fingerprint": "FINGERPRINT_OK"
+  },
+  "machine": {
+    "os": "windows",
+    "app_instance_id": "00000000-0000-4000-8000-000000000000"
+  }
+}
